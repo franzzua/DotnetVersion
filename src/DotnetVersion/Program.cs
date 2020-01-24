@@ -100,150 +100,152 @@ namespace DotnetVersion
                 projectFile.Exists == false)
                 throw new CliException(1, $"Unable to find a project file in directory '{currentDirectory}'.");
 
-            var xDocument = XDocument.Load(projectFile.OpenRead());
-            var versionElement = xDocument.Root?.Descendants("Version").FirstOrDefault();
-            var currentVersion = ParseVersion(versionElement?.Value ?? "0.0.0");
+            using (var stream = projectFile.Open(FileMode.Open, FileAccess.ReadWrite)) {
+                var xDocument = XDocument.Load(stream);
+                var versionElement = xDocument.Root?.Descendants("Version").FirstOrDefault();
+                var currentVersion = ParseVersion(versionElement?.Value ?? "0.0.0");
 
-            WriteLine($"Current version: {currentVersion}");
+                WriteLine($"Current version: {currentVersion}");
 
-            if (Show)
-                return;
+                if (Show)
+                    return;
 
-            SemVersion version = null;
+                SemVersion version = null;
 
-            if (!string.IsNullOrWhiteSpace(NewVersion))
-            {
-                version = ParseVersion(NewVersion);
-            }
-            else
-            {
-                if (Major)
+                if (!string.IsNullOrWhiteSpace(NewVersion))
                 {
-                    version = currentVersion.Change(
-                        currentVersion.Major + 1,
-                        0,
-                        0,
-                        "",
-                        "");
+                    version = ParseVersion(NewVersion);
                 }
-                else if (Minor)
+                else
                 {
-                    version = currentVersion.Change(
-                        minor: currentVersion.Minor + 1,
-                        patch: 0,
-                        prerelease: "",
-                        build: "");
-                }
-                else if (Patch)
-                {
-                    version = currentVersion.Change(
-                        patch: currentVersion.Patch + 1,
-                        prerelease: "",
-                        build: "");
-                }
-
-                if (ReleaseCandidate)
-                {
-                    version = (version ?? currentVersion).Change(
-                        prerelease: CreatePreReleaseString(
-                            ReleaseCandidateString,
-                            version is null ? currentVersion.Prerelease : ""),
-                        build: "");
-                }
-                else if (Beta)
-                {
-                    if (version is null &&
-                        currentVersion.Prerelease.StartsWith(ReleaseCandidateString,
-                            StringComparison.OrdinalIgnoreCase))
-                        throw new CliException(1,
-                            "Can't increment beta version number of a release candidate version number.");
-
-                    version = (version ?? currentVersion).Change(
-                        prerelease: CreatePreReleaseString(BetaString,
-                            version is null ? currentVersion.Prerelease : ""),
-                        build: "");
-                }
-                else if (Alpha)
-                {
-                    if (version is null &&
-                        currentVersion.Prerelease.StartsWith(ReleaseCandidateString,
-                            StringComparison.OrdinalIgnoreCase))
-                        throw new CliException(1,
-                            "Can't increment alpha version number of a release candidate version number.");
-                    if (version is null &&
-                        currentVersion.Prerelease.StartsWith(BetaString, StringComparison.OrdinalIgnoreCase))
-                        throw new CliException(1, "Can't increment alpha version number of a beta version number.");
-
-                    version = (version ?? currentVersion).Change(
-                        prerelease: CreatePreReleaseString(AlphaString,
-                            version is null ? currentVersion.Prerelease : ""),
-                        build: "");
-                }
-            }
-
-            if (version is null)
-            {
-                var inputVersion = Prompt.GetString("New version:");
-                version = ParseVersion(inputVersion);
-            }
-            else
-                WriteLine($"New version: {version}");
-
-            if (versionElement is null)
-            {
-                var propertyGroupElement = xDocument.Root?.Descendants("PropertyGroup").FirstOrDefault();
-                if (propertyGroupElement is null)
-                {
-                    propertyGroupElement = new XElement("PropertyGroup");
-                    xDocument.Root?.Add(propertyGroupElement);
-                }
-
-                propertyGroupElement.Add(new XElement("Version", version));
-            }
-            else
-                versionElement.Value = version.ToString();
-
-            File.WriteAllText(projectFile.FullName, xDocument.ToString());
-
-            if (!NoGit)
-            {
-                if (string.IsNullOrWhiteSpace(ProjectFilePath))
-                {
-                    try
+                    if (Major)
                     {
-                        var tag = $"{GitVersionPrefix}{version}";
-                        var message = !string.IsNullOrWhiteSpace(CommitMessage)
-                            ? CommitMessage
-                            : tag;
-                        Process.Start(new ProcessStartInfo("git", $"commit -am \"{message}\"")
+                        version = currentVersion.Change(
+                            currentVersion.Major + 1,
+                            0,
+                            0,
+                            "",
+                            "");
+                    }
+                    else if (Minor)
+                    {
+                        version = currentVersion.Change(
+                            minor: currentVersion.Minor + 1,
+                            patch: 0,
+                            prerelease: "",
+                            build: "");
+                    }
+                    else if (Patch)
+                    {
+                        version = currentVersion.Change(
+                            patch: currentVersion.Patch + 1,
+                            prerelease: "",
+                            build: "");
+                    }
+
+                    if (ReleaseCandidate)
+                    {
+                        version = (version ?? currentVersion).Change(
+                            prerelease: CreatePreReleaseString(
+                                ReleaseCandidateString,
+                                version is null ? currentVersion.Prerelease : ""),
+                            build: "");
+                    }
+                    else if (Beta)
+                    {
+                        if (version is null &&
+                            currentVersion.Prerelease.StartsWith(ReleaseCandidateString,
+                                StringComparison.OrdinalIgnoreCase))
+                            throw new CliException(1,
+                                "Can't increment beta version number of a release candidate version number.");
+
+                        version = (version ?? currentVersion).Change(
+                            prerelease: CreatePreReleaseString(BetaString,
+                                version is null ? currentVersion.Prerelease : ""),
+                            build: "");
+                    }
+                    else if (Alpha)
+                    {
+                        if (version is null &&
+                            currentVersion.Prerelease.StartsWith(ReleaseCandidateString,
+                                StringComparison.OrdinalIgnoreCase))
+                            throw new CliException(1,
+                                "Can't increment alpha version number of a release candidate version number.");
+                        if (version is null &&
+                            currentVersion.Prerelease.StartsWith(BetaString, StringComparison.OrdinalIgnoreCase))
+                            throw new CliException(1, "Can't increment alpha version number of a beta version number.");
+
+                        version = (version ?? currentVersion).Change(
+                            prerelease: CreatePreReleaseString(AlphaString,
+                                version is null ? currentVersion.Prerelease : ""),
+                            build: "");
+                    }
+                }
+
+                if (version is null)
+                {
+                    var inputVersion = Prompt.GetString("New version:");
+                    version = ParseVersion(inputVersion);
+                }
+                else
+                    WriteLine($"New version: {version}");
+
+                if (versionElement is null)
+                {
+                    var propertyGroupElement = xDocument.Root?.Descendants("PropertyGroup").FirstOrDefault();
+                    if (propertyGroupElement is null)
+                    {
+                        propertyGroupElement = new XElement("PropertyGroup");
+                        xDocument.Root?.Add(propertyGroupElement);
+                    }
+
+                    propertyGroupElement.Add(new XElement("Version", version));
+                }
+                else
+                    versionElement.Value = version.ToString();
+
+                xDocument.Save(stream);
+
+                if (!NoGit)
+                {
+                    if (string.IsNullOrWhiteSpace(ProjectFilePath))
+                    {
+                        try
                         {
-                            RedirectStandardError = true,
-                            RedirectStandardOutput = true,
-                        })?.WaitForExit();
-                        if (!NoGitTag)
-                        {
-                            // Hack to make sure the wrong commit is tagged
-                            Thread.Sleep(200);
-                            Process.Start(new ProcessStartInfo("git", $"tag {tag}")
+                            var tag = $"{GitVersionPrefix}{version}";
+                            var message = !string.IsNullOrWhiteSpace(CommitMessage)
+                                ? CommitMessage
+                                : tag;
+                            Process.Start(new ProcessStartInfo("git", $"commit -am \"{message}\"")
                             {
                                 RedirectStandardError = true,
                                 RedirectStandardOutput = true,
                             })?.WaitForExit();
+                            if (!NoGitTag)
+                            {
+                                // Hack to make sure the wrong commit is tagged
+                                Thread.Sleep(200);
+                                Process.Start(new ProcessStartInfo("git", $"tag {tag}")
+                                {
+                                    RedirectStandardError = true,
+                                    RedirectStandardOutput = true,
+                                })?.WaitForExit();
+                            }
+                        }
+                        catch
+                        {
+                            /* Ignored */
                         }
                     }
-                    catch
+                    else
                     {
-                        /* Ignored */
+                        WriteLine(
+                            "Not running git integration when project file has been specified, to prevent running git in wrong directory.");
                     }
                 }
-                else
-                {
-                    WriteLine(
-                        "Not running git integration when project file has been specified, to prevent running git in wrong directory.");
-                }
-            }
 
-            WriteLine($"Successfully set version to {version}");
+                WriteLine($"Successfully set version to {version}");
+            }
         }
 
         private SemVersion ParseVersion(string version)
